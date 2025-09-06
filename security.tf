@@ -16,48 +16,39 @@ resource "aws_security_group" "swarm_manager" {
     cidr_blocks = var.allowed_cidr_blocks
   }
 
-  # Docker Swarm management port
+  # Docker Swarm management port (allow from VPC)
   ingress {
-    description     = "Docker Swarm Management"
-    from_port       = 2377
-    to_port         = 2377
-    protocol        = "tcp"
-    security_groups = [aws_security_group.swarm_worker.id]
+    description = "Docker Swarm Management"
+    from_port   = 2377
+    to_port     = 2377
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
-  # Docker daemon API (if needed)
+  # Container network discovery (allow from VPC)
   ingress {
-    description     = "Docker Daemon API"
-    from_port       = 2376
-    to_port         = 2376
-    protocol        = "tcp"
-    security_groups = [aws_security_group.swarm_worker.id]
-  }
-
-  # Container network discovery
-  ingress {
-    description     = "Container Network Discovery"
-    from_port       = 7946
-    to_port         = 7946
-    protocol        = "tcp"
-    security_groups = [aws_security_group.swarm_worker.id]
+    description = "Container Network Discovery"
+    from_port   = 7946
+    to_port     = 7946
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   ingress {
-    description     = "Container Network Discovery UDP"
-    from_port       = 7946
-    to_port         = 7946
-    protocol        = "udp"
-    security_groups = [aws_security_group.swarm_worker.id]
+    description = "Container Network Discovery UDP"
+    from_port   = 7946
+    to_port     = 7946
+    protocol    = "udp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
-  # Overlay network traffic
+  # Overlay network traffic (allow from VPC)
   ingress {
-    description     = "Overlay Network Traffic"
-    from_port       = 4789
-    to_port         = 4789
-    protocol        = "udp"
-    security_groups = [aws_security_group.swarm_worker.id]
+    description = "Overlay Network Traffic"
+    from_port   = 4789
+    to_port     = 4789
+    protocol    = "udp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   # HTTP and HTTPS for applications
@@ -119,33 +110,30 @@ resource "aws_security_group" "swarm_worker" {
     cidr_blocks = var.allowed_cidr_blocks
   }
 
-  # Container network discovery
+  # Container network discovery (allow from VPC)
   ingress {
-    description     = "Container Network Discovery"
-    from_port       = 7946
-    to_port         = 7946
-    protocol        = "tcp"
-    security_groups = [aws_security_group.swarm_manager.id]
-    self            = true
+    description = "Container Network Discovery"
+    from_port   = 7946
+    to_port     = 7946
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   ingress {
-    description     = "Container Network Discovery UDP"
-    from_port       = 7946
-    to_port         = 7946
-    protocol        = "udp"
-    security_groups = [aws_security_group.swarm_manager.id]
-    self            = true
+    description = "Container Network Discovery UDP"
+    from_port   = 7946
+    to_port     = 7946
+    protocol    = "udp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
-  # Overlay network traffic
+  # Overlay network traffic (allow from VPC)
   ingress {
-    description     = "Overlay Network Traffic"
-    from_port       = 4789
-    to_port         = 4789
-    protocol        = "udp"
-    security_groups = [aws_security_group.swarm_manager.id]
-    self            = true
+    description = "Overlay Network Traffic"
+    from_port   = 4789
+    to_port     = 4789
+    protocol    = "udp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   # HTTP and HTTPS for applications

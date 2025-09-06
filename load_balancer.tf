@@ -10,6 +10,12 @@ resource "aws_lb" "main" {
 
   enable_deletion_protection = false
 
+  # Explicit dependency: Wait for EC2 instances to be ready
+  depends_on = [
+    aws_instance.swarm_manager,
+    aws_instance.swarm_workers
+  ]
+
   tags = {
     Name = "${var.project_name}-alb"
   }

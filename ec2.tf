@@ -71,6 +71,7 @@ resource "aws_instance" "swarm_workers" {
     Type = "Worker"
   }
 
+  # Explicit dependency: Workers must wait for manager to be ready
   depends_on = [aws_instance.swarm_manager]
 
   lifecycle {
