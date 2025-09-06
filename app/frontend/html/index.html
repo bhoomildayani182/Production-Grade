@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker Swarm Microservices Demo</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .container {
+            padding-top: 50px;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px);
+            background: rgba(255,255,255,0.95);
+        }
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 25px;
+            padding: 10px 30px;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        .status-healthy { background-color: #28a745; }
+        .status-unhealthy { background-color: #dc3545; }
+        .status-unknown { background-color: #ffc107; }
+        .metric-card {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 10px 0;
+            color: white;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-10">
+                <div class="card">
+                    <div class="card-header bg-primary text-white text-center">
+                        <h1><i class="fab fa-docker"></i> Docker Swarm Cluster Dashboard</h1>
+                        <p class="mb-0">Production-Grade Microservices Architecture</p>
+                    </div>
+                    <div class="card-body">
+                        <!-- System Status -->
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <h3><i class="fas fa-heartbeat"></i> System Health</h3>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="card bg-light">
+                                            <div class="card-body text-center">
+                                                <h5>Frontend Status</h5>
+                                                <span id="frontend-status" class="status-indicator status-unknown"></span>
+                                                <span id="frontend-text">Checking...</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card bg-light">
+                                            <div class="card-body text-center">
+                                                <h5>Backend API Status</h5>
+                                                <span id="backend-status" class="status-indicator status-unknown"></span>
+                                                <span id="backend-text">Checking...</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card bg-light">
+                                            <div class="card-body text-center">
+                                                <h5>Database Status</h5>
+                                                <span id="database-status" class="status-indicator status-unknown"></span>
+                                                <span id="database-text">Checking...</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- API Testing -->
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <h3><i class="fas fa-code"></i> API Testing</h3>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <button class="btn btn-primary w-100 mb-2" onclick="testAPI()">
+                                            <i class="fas fa-play"></i> Test API Endpoint
+                                        </button>
+                                        <button class="btn btn-success w-100 mb-2" onclick="loadUsers()">
+                                            <i class="fas fa-users"></i> Load Sample Data
+                                        </button>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card bg-light">
+                                            <div class="card-body">
+                                                <h6>API Response:</h6>
+                                                <pre id="api-response" style="max-height: 200px; overflow-y: auto;">Click "Test API Endpoint" to see response</pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Cluster Information -->
+                        <div class="row mb-4">
+                            <div class="col-md-12">
+                                <h3><i class="fas fa-server"></i> Cluster Information</h3>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="card bg-info text-white">
+                                            <div class="card-body">
+                                                <h5><i class="fas fa-crown"></i> Manager Nodes</h5>
+                                                <p id="manager-count" class="h4">1</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="card bg-success text-white">
+                                            <div class="card-body">
+                                                <h5><i class="fas fa-cogs"></i> Worker Nodes</h5>
+                                                <p id="worker-count" class="h4">2</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Architecture Overview -->
+                        <div class="row">
+                            <div class="col-md-12">
+                                <h3><i class="fas fa-sitemap"></i> Architecture Overview</h3>
+                                <div class="card bg-light">
+                                    <div class="card-body">
+                                        <div class="row text-center">
+                                            <div class="col-md-3">
+                                                <i class="fas fa-globe fa-3x text-primary mb-2"></i>
+                                                <h6>Load Balancer</h6>
+                                                <small>AWS ALB with SSL</small>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <i class="fas fa-route fa-3x text-info mb-2"></i>
+                                                <h6>Traefik Proxy</h6>
+                                                <small>Reverse Proxy & SSL</small>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <i class="fas fa-layer-group fa-3x text-success mb-2"></i>
+                                                <h6>Microservices</h6>
+                                                <small>Nginx + Node.js API</small>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <i class="fas fa-database fa-3x text-warning mb-2"></i>
+                                                <h6>Data Layer</h6>
+                                                <small>PostgreSQL + Redis</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-footer text-center text-muted">
+                        <small>Deployed on AWS Docker Swarm Cluster | Managed by Terraform</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Check system health on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkSystemHealth();
+            setInterval(checkSystemHealth, 30000); // Check every 30 seconds
+        });
+
+        async function checkSystemHealth() {
+            // Check frontend (always healthy since we're running)
+            updateStatus('frontend', true, 'Healthy');
+
+            // Check backend API
+            try {
+                const response = await fetch('/api/health');
+                if (response.ok) {
+                    updateStatus('backend', true, 'Healthy');
+                } else {
+                    updateStatus('backend', false, 'Unhealthy');
+                }
+            } catch (error) {
+                updateStatus('backend', false, 'Unreachable');
+            }
+
+            // Check database through API
+            try {
+                const response = await fetch('/api/database/health');
+                if (response.ok) {
+                    updateStatus('database', true, 'Connected');
+                } else {
+                    updateStatus('database', false, 'Disconnected');
+                }
+            } catch (error) {
+                updateStatus('database', false, 'Unknown');
+            }
+        }
+
+        function updateStatus(service, isHealthy, text) {
+            const statusElement = document.getElementById(`${service}-status`);
+            const textElement = document.getElementById(`${service}-text`);
+            
+            statusElement.className = `status-indicator ${isHealthy ? 'status-healthy' : 'status-unhealthy'}`;
+            textElement.textContent = text;
+        }
+
+        async function testAPI() {
+            const responseElement = document.getElementById('api-response');
+            responseElement.innerHTML = '<div class="loading"></div> Testing API...';
+
+            try {
+                const response = await fetch('/api/test');
+                const data = await response.json();
+                responseElement.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                responseElement.textContent = `Error: ${error.message}`;
+            }
+        }
+
+        async function loadUsers() {
+            const responseElement = document.getElementById('api-response');
+            responseElement.innerHTML = '<div class="loading"></div> Loading users...';
+
+            try {
+                const response = await fetch('/api/users');
+                const data = await response.json();
+                responseElement.textContent = JSON.stringify(data, null, 2);
+            } catch (error) {
+                responseElement.textContent = `Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

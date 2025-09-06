@@ -1,0 +1,35 @@
+# Terraform Variables Configuration
+# Copy this file to terraform.tfvars and modify the values as needed
+
+# AWS Configuration
+aws_region = "us-west-2"
+
+# Project Configuration
+project_name = "docker-swarm-cluster"
+environment  = "production"
+
+# Network Configuration
+vpc_cidr             = "10.0.0.0/16"
+public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs = ["10.0.10.0/24", "10.0.20.0/24"]
+
+# EC2 Configuration
+instance_type = "t3.medium"  # Recommended: t3.medium or larger for production
+key_name      = "docker-swarm-key"
+
+# Security Configuration
+allowed_cidr_blocks = ["0.0.0.0/0"]  # IMPORTANT: Restrict this to your IP in production
+
+# Swarm Configuration
+swarm_manager_count = 1
+swarm_worker_count  = 2
+
+# DNS Configuration (Optional)
+domain_name     = ""  # Set your domain name if using Route53
+enable_route53  = false
+enable_ssl      = true
+
+# Example with domain:
+# domain_name     = "example.com"
+# enable_route53  = true
+# enable_ssl      = true
