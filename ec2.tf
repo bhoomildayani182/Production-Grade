@@ -45,7 +45,7 @@ resource "aws_instance" "swarm_workers" {
   instance_type          = var.instance_type
   key_name               = aws_key_pair.main.key_name
   vpc_security_group_ids = [aws_security_group.swarm_worker.id]
-  subnet_id              = aws_subnet.public[count.index % length(aws_subnet.public)].id
+  subnet_id              = aws_subnet.private[count.index % length(aws_subnet.private)].id
   
   user_data = local.worker_user_data
 

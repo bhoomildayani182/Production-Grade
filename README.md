@@ -22,6 +22,135 @@ This project creates a production-ready Docker Swarm cluster with the following 
 - **Cache**: Redis for session management and caching
 - **Monitoring**: Built-in health checks and logging
 
+## 🏗️ Network Architecture (Production-Grade Security)
+
+### Infrastructure Layout
+
+The Docker Swarm cluster follows a secure multi-tier architecture with proper network segmentation:
+
+```
+Production-Ready Security Architecture:
+┌─────────────────────────────────────────────────────────────────┐
+│                        VPC (10.0.0.0/16)                       │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                   Public Subnets                            ││
+│  │  ┌─────────────────┐  ┌─────────────────────────────────────┐││
+│  │  │  Swarm Manager  │  │      Application Load Balancer     │││
+│  │  │   (Public IP)   │  │        (Internet Gateway)          │││
+│  │  │   + Elastic IP  │  │         SSL Termination             │││
+│  │  │   + Traefik     │  │                                     │││
+│  │  └─────────────────┘  └─────────────────────────────────────┘││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                  Private Subnets                            ││
+│  │  ┌─────────────────┐  ┌─────────────────────────────────────┐││
+│  │  │   Worker Node   │  │           Worker Node               │││
+│  │  │  (Private IP)   │  │         (Private IP)                │││
+│  │  │   Applications  │  │         Applications                │││
+│  │  │   + Services    │  │         + Services                  │││
+│  │  └─────────────────┘  └─────────────────────────────────────┘││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  NAT Gateways (Multi-AZ) for secure outbound internet access   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Node Configuration
+
+| Component | Count | Placement | Network Access | Purpose |
+|-----------|-------|-----------|----------------|---------|
+| **Manager Node** | 1 | Public Subnet | Public IP + EIP | Swarm management, Traefik proxy, SSL termination |
+| **Worker Nodes** | 2 | Private Subnets | Private IP only | Application workloads, microservices |
+| **Load Balancer** | 1 | Public Subnets | Internet-facing | Traffic distribution, SSL termination |
+| **NAT Gateways** | 2 | Public Subnets | Multi-AZ redundancy | Secure outbound internet for private nodes |
+
+### Security Architecture Benefits
+
+#### **Network Segmentation**
+- **Public Tier**: Only manager node and load balancer exposed to internet
+- **Private Tier**: Worker nodes isolated from direct internet access
+- **Multi-AZ**: High availability across multiple availability zones
+
+#### **Traffic Flow Security**
+```
+Internet Traffic Flow:
+1. Internet → AWS ALB (SSL Termination)
+2. ALB → Manager Node (Traefik Proxy)
+3. Traefik → Docker Swarm Routing Mesh
+4. Routing Mesh → Worker Nodes (Private Network)
+
+Outbound Traffic Flow:
+1. Worker Nodes → NAT Gateway
+2. NAT Gateway → Internet Gateway
+3. Internet (Updates, Docker Hub, etc.)
+```
+
+#### **Access Control**
+- **SSH Access**: Only to manager node via bastion pattern
+- **Application Access**: Through load balancer only
+- **Inter-node Communication**: Encrypted Docker Swarm overlay networks
+- **Database Access**: Internal network only, no external exposure
+
+### Network Security Features
+
+#### **Security Groups (Firewall Rules)**
+- **Manager SG**: SSH (22), HTTP (80), HTTPS (443), Swarm management (2377), Traefik (8080)
+- **Worker SG**: Only internal Swarm communication ports (7946, 4789)
+- **ALB SG**: HTTP (80) and HTTPS (443) from internet
+
+#### **Encryption**
+- **In-Transit**: TLS 1.2+ for all external traffic, Docker Swarm overlay encryption
+- **At-Rest**: Encrypted EBS volumes for all instances
+- **Secrets**: Docker Swarm secrets management for sensitive data
+
+#### **Network Access Control**
+- **Private Subnets**: No direct internet access, NAT Gateway for outbound only
+- **Route Tables**: Separate routing for public and private subnets
+- **NACLs**: Additional network-level security (default allow, can be restricted)
+
+### Docker Swarm Networking
+
+#### **Overlay Networks**
+- **traefik-public**: External-facing services (Traefik, frontend)
+- **app-network**: Internal application communication
+- **Encrypted**: All overlay traffic encrypted by default
+
+#### **Service Discovery**
+- **Automatic**: Docker Swarm built-in service discovery
+- **DNS**: Internal DNS resolution for service names
+- **Load Balancing**: Built-in load balancing across replicas
+
+#### **Placement Constraints**
+```yaml
+# Strategic service placement for optimal security and performance
+Manager Node:
+  - Traefik (requires Docker API access)
+  - PostgreSQL (data persistence)
+  - Management services
+
+Worker Nodes:
+  - Frontend applications (Nginx)
+  - Backend APIs (Node.js)
+  - Redis cache
+  - Application workloads
+```
+
+### Scalability and High Availability
+
+#### **Horizontal Scaling**
+- **Worker Nodes**: Easily add more by updating `swarm_worker_count`
+- **Service Replicas**: Scale individual services via Docker Swarm
+- **Multi-AZ**: Automatic distribution across availability zones
+
+#### **Load Distribution**
+- **ALB**: Distributes traffic across healthy targets
+- **Docker Swarm**: Internal load balancing via routing mesh
+- **Geographic**: Multi-AZ deployment for regional redundancy
+
+This architecture ensures production-grade security while maintaining scalability, high availability, and operational simplicity through Infrastructure as Code principles.
+
 ## 🚀 Quick Start
 
 ### Prerequisites

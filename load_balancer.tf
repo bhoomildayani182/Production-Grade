@@ -76,22 +76,9 @@ resource "aws_lb_target_group_attachment" "manager_https" {
   port             = 443
 }
 
-# Attach Swarm Workers to target groups
-resource "aws_lb_target_group_attachment" "workers_http" {
-  count = length(aws_instance.swarm_workers)
-
-  target_group_arn = aws_lb_target_group.http.arn
-  target_id        = aws_instance.swarm_workers[count.index].id
-  port             = 80
-}
-
-resource "aws_lb_target_group_attachment" "workers_https" {
-  count = length(aws_instance.swarm_workers)
-
-  target_group_arn = aws_lb_target_group.https.arn
-  target_id        = aws_instance.swarm_workers[count.index].id
-  port             = 443
-}
+# Note: Workers are in private subnets and will be reached via Docker Swarm routing mesh
+# The manager node will route traffic to workers automatically through the overlay network
+# This is more secure and follows Docker Swarm best practices
 
 # HTTP Listener (redirects to HTTPS)
 resource "aws_lb_listener" "http" {
