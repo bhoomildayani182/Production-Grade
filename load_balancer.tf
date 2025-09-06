@@ -47,6 +47,8 @@ resource "aws_lb_target_group" "http" {
 
 # Target Group for HTTPS traffic
 resource "aws_lb_target_group" "https" {
+  count = var.enable_ssl && var.enable_route53 && var.domain_name != "" ? 1 : 0
+  
   name     = "${var.project_name}-https-tg"
   port     = 443
   protocol = "HTTP"
@@ -77,7 +79,9 @@ resource "aws_lb_target_group_attachment" "manager_http" {
 }
 
 resource "aws_lb_target_group_attachment" "manager_https" {
-  target_group_arn = aws_lb_target_group.https.arn
+  count = var.enable_ssl && var.enable_route53 && var.domain_name != "" ? 1 : 0
+  
+  target_group_arn = aws_lb_target_group.https[0].arn
   target_id        = aws_instance.swarm_manager.id
   port             = 443
 }
@@ -105,7 +109,7 @@ resource "aws_lb_listener" "http" {
 
 # HTTPS Listener
 resource "aws_lb_listener" "https" {
-  count = var.enable_ssl ? 1 : 0
+  count = var.enable_ssl && var.enable_route53 && var.domain_name != "" ? 1 : 0
 
   load_balancer_arn = aws_lb.main.arn
   port              = "443"
@@ -115,7 +119,7 @@ resource "aws_lb_listener" "https" {
 
   default_action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.https.arn
+    target_group_arn = aws_lb_target_group.https[0].arn
   }
 
   depends_on = [aws_acm_certificate_validation.main]
