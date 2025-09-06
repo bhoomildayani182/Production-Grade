@@ -30,31 +30,34 @@ The Docker Swarm cluster follows a secure multi-tier architecture with proper ne
 
 ```
 Production-Ready Security Architecture:
-┌─────────────────────────────────────────────────────────────────┐
-│                        VPC (10.0.0.0/16)                       │
-│                                                                 │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │                   Public Subnets                            ││
-│  │  ┌─────────────────┐  ┌─────────────────────────────────────┐││
-│  │  │  Swarm Manager  │  │      Application Load Balancer     │││
-│  │  │   (Public IP)   │  │        (Internet Gateway)          │││
-│  │  │   + Elastic IP  │  │         SSL Termination             │││
-│  │  │   + Traefik     │  │                                     │││
-│  │  └─────────────────┘  └─────────────────────────────────────┘││
-│  └─────────────────────────────────────────────────────────────┘│
-│                                                                 │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │                  Private Subnets                            ││
-│  │  ┌─────────────────┐  ┌─────────────────────────────────────┐││
-│  │  │   Worker Node   │  │           Worker Node               │││
-│  │  │  (Private IP)   │  │         (Private IP)                │││
-│  │  │   Applications  │  │         Applications                │││
-│  │  │   + Services    │  │         + Services                  │││
-│  │  └─────────────────┘  └─────────────────────────────────────┘││
-│  └─────────────────────────────────────────────────────────────┘│
-│                                                                 │
-│  NAT Gateways (Multi-AZ) for secure outbound internet access   │
-└─────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                             VPC (10.0.0.0/16)                            │
+│                                                                          │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │                          Public Subnets                            │  │
+│  │                                                                    │  │
+│  │   ┌────────────────────┐       ┌────────────────────────────────┐  │  │
+│  │   │ + Elastic IP       │       │   Application Load Balancer    │  │  │
+│  │   │ Swarm Manager      │       │       (SSL Termination)        │  │  │
+│  │   │ (Public IP)        │       │    + Internet Gateway (IGW)    │  │  │
+│  │   │ + Traefik          │       │                                │  │  │
+│  │   └────────────────────┘       └────────────────────────────────┘  │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+│                                                                          │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │                          Private Subnets                           │  │
+│  │                                                                    │  │
+│  │   ┌────────────────────┐       ┌────────────────────────────────┐  │  │
+│  │   │ Worker Node        │       │ Worker Node                    │  │  │
+│  │   │ (Private IP)       │       │ (Private IP)                   │  │  │
+│  │   │ Applications +     │       │ Applications + Services        │  │  │
+│  │   │ Services           │       │                                │  │  │
+│  │   └────────────────────┘       └────────────────────────────────┘  │  │
+│  └────────────────────────────────────────────────────────────────────┘  │
+│                                                                          │
+│          NAT Gateways (Multi-AZ) → Secure Outbound Internet Access       │
+└──────────────────────────────────────────────────────────────────────────┘
+
 ```
 
 ### Node Configuration
@@ -213,45 +216,186 @@ chmod +x deploy.sh destroy.sh
 └── README.md              # This file
 ```
 
-## 🏛️ Architectural Decisions
+## 🏛️ Architectural Overview & Key Decisions
 
-### 1. **Multi-AZ Deployment**
-- **Decision**: Deploy across multiple Availability Zones
-- **Reasoning**: Ensures high availability and fault tolerance
-- **Implementation**: Public/private subnets in 2+ AZs with NAT gateways
+This section outlines the fundamental architectural decisions made in designing this production-grade Docker Swarm infrastructure, with emphasis on scalability, maintainability, and operational excellence.
 
-### 2. **Security-First Approach**
-- **Decision**: Implement defense-in-depth security
-- **Reasoning**: Production workloads require robust security
-- **Implementation**: 
-  - Security groups with minimal required ports
-  - Private subnets for databases
-  - Encrypted EBS volumes
-  - SSL/TLS everywhere
+### **Core Architecture Philosophy**
 
-### 3. **Traefik as Reverse Proxy**
-- **Decision**: Use Traefik instead of traditional load balancers
-- **Reasoning**: 
-  - Automatic service discovery
-  - Built-in Let's Encrypt integration
-  - Docker Swarm native support
-- **Implementation**: Deployed on manager nodes with overlay networks
+The architecture follows a **microservices-first, cloud-native approach** with these guiding principles:
+- **Scalability by Design**: Horizontal scaling capabilities at every layer
+- **Security by Default**: Zero-trust network model with defense-in-depth
+- **Operational Simplicity**: Automated deployment and management
+- **Cost Optimization**: Efficient resource utilization and AWS cost management
 
-### 4. **Infrastructure as Code**
-- **Decision**: Use Terraform for all infrastructure
-- **Reasoning**: 
-  - Version control and reproducibility
-  - State management
-  - Team collaboration
-- **Implementation**: Modular Terraform with clear separation of concerns
+### **1. Multi-Tier Network Architecture**
 
-### 5. **Placement Constraints**
-- **Decision**: Strategic service placement across nodes
-- **Reasoning**: Optimize resource utilization and availability
-- **Implementation**:
-  - Traefik on manager nodes (access to Docker API)
-  - Applications on worker nodes (resource isolation)
-  - Database on manager (data persistence)
+#### **Decision**: Three-tier network segmentation (Public → Private → Data)
+#### **Reasoning**: 
+- **Security Isolation**: Each tier has different security requirements
+- **Scalability**: Independent scaling of each tier
+- **Compliance**: Meets enterprise security standards
+- **Fault Tolerance**: Multi-AZ deployment prevents single points of failure
+
+#### **Implementation**:
+```
+Internet → ALB (Public) → Manager (Public) → Workers (Private) → Database (Internal)
+```
+
+**Scalability Considerations**:
+- **Horizontal**: Add more AZs and subnets as needed
+- **Vertical**: Upgrade instance types per tier independently
+- **Geographic**: Multi-region deployment ready
+
+**Maintainability Benefits**:
+- Clear separation of concerns
+- Independent security policies per tier
+- Simplified troubleshooting and monitoring
+
+### **2. Container Orchestration: Docker Swarm vs Kubernetes**
+
+#### **Decision**: Docker Swarm over Kubernetes
+#### **Reasoning**:
+- **Simplicity**: 80% fewer configuration files than Kubernetes
+- **Learning Curve**: Faster team onboarding and adoption
+- **Resource Efficiency**: Lower overhead (no etcd, fewer control plane components)
+- **Built-in Features**: Native load balancing, service discovery, secrets management
+
+#### **Scalability Analysis**:
+| Aspect | Docker Swarm | Kubernetes | Our Choice |
+|--------|--------------|------------|------------|
+| **Cluster Size** | Up to 2,000 nodes | 5,000+ nodes | ✅ Swarm (sufficient) |
+| **Learning Curve** | Low | High | ✅ Swarm (team efficiency) |
+| **Operational Overhead** | Low | High | ✅ Swarm (maintainability) |
+| **Ecosystem** | Moderate | Extensive | ⚖️ Trade-off accepted |
+
+**Future Migration Path**: Architecture designed to migrate to Kubernetes if needed (containerized services, overlay networks, service mesh ready)
+
+### **3. Reverse Proxy Strategy: Traefik Selection**
+
+#### **Decision**: Traefik as the primary reverse proxy and load balancer
+#### **Reasoning**:
+- **Container-Native**: Built specifically for containerized environments
+- **Zero-Configuration**: Automatic service discovery via Docker labels
+- **SSL Automation**: Let's Encrypt integration with automatic renewal
+- **Modern Features**: HTTP/2, WebSocket support, circuit breakers
+
+#### **Comparison with Alternatives**:
+```yaml
+# Traditional Nginx Approach (Rejected)
+nginx:
+  pros: [Performance, Maturity, Flexibility]
+  cons: [Manual configuration, No service discovery, Complex SSL setup]
+  
+# HAProxy Approach (Rejected)  
+haproxy:
+  pros: [Performance, Load balancing features]
+  cons: [No SSL termination, Manual service registration, Complex config]
+
+# Traefik Approach (Selected)
+traefik:
+  pros: [Auto-discovery, SSL automation, Container-native, Dashboard]
+  cons: [Newer technology, Learning curve]
+  decision: Benefits outweigh risks for containerized workloads
+```
+
+**Scalability Features**:
+- **Multi-instance**: Can run multiple Traefik instances for HA
+- **Dynamic Routing**: No restarts needed for new services
+- **Circuit Breakers**: Automatic failure handling and recovery
+
+### **4. Infrastructure as Code: Terraform Architecture**
+
+#### **Decision**: Modular Terraform with state management
+#### **File Structure Rationale**:
+```
+├── main.tf          # Core configuration and data sources
+├���─ variables.tf     # Centralized variable definitions
+├── outputs.tf       # Reusable outputs for other modules
+├── vpc.tf          # Network infrastructure (isolated)
+├── security.tf     # Security groups (security-focused)
+├── ec2.tf          # Compute resources (scalable)
+├── load_balancer.tf # Traffic management (performance)
+└── ssl.tf          # Certificate management (security)
+```
+
+**Maintainability Benefits**:
+- **Single Responsibility**: Each file has one concern
+- **Reusability**: Modules can be reused across environments
+- **Version Control**: Infrastructure changes are tracked
+- **Team Collaboration**: Multiple developers can work simultaneously
+
+**Scalability Considerations**:
+- **Environment Separation**: Dev/Staging/Prod with same codebase
+- **Resource Scaling**: Variables control instance counts and sizes
+- **Multi-Region**: Architecture supports cross-region deployment
+
+### **5. Service Placement Strategy**
+
+#### **Decision**: Strategic service placement with node role constraints
+#### **Implementation**:
+```yaml
+# Manager Nodes (Control Plane)
+manager_services:
+  - traefik          # Needs Docker API access
+  - postgres         # Data persistence and backup
+  - monitoring       # Cluster-wide visibility
+
+# Worker Nodes (Application Plane)  
+worker_services:
+  - frontend         # Stateless, horizontally scalable
+  - backend_api      # Stateless, auto-scaling
+  - redis            # Distributed caching
+  - batch_jobs       # Resource-intensive tasks
+```
+
+**Reasoning**:
+- **Resource Isolation**: Separate control plane from application workloads
+- **Security**: Sensitive services on more secure manager nodes
+- **Performance**: Compute-intensive apps on dedicated worker nodes
+- **Availability**: Critical services on stable manager nodes
+
+### **6. Data Architecture Decisions**
+
+#### **Database Strategy**: PostgreSQL on Manager Nodes
+- **Reasoning**: ACID compliance, mature ecosystem, excellent Docker support
+- **Scalability**: Read replicas, connection pooling, horizontal partitioning ready
+- **Maintainability**: Well-known technology, extensive tooling
+
+#### **Caching Strategy**: Redis on Worker Nodes
+- **Reasoning**: High-performance, distributed caching, session management
+- **Scalability**: Redis Cluster mode for horizontal scaling
+- **Placement**: Worker nodes to reduce latency to applications
+
+### **7. Security Architecture**
+
+#### **Zero-Trust Network Model**:
+```
+Security Layers:
+1. AWS Security Groups (Network Firewall)
+2. VPC Network ACLs (Subnet-level Control)  
+3. Docker Swarm Overlay Encryption (Container Communication)
+4. TLS/SSL Everywhere (Data in Transit)
+5. EBS Encryption (Data at Rest)
+6. IAM Roles (Least Privilege Access)
+```
+
+**Scalability**: Security policies scale automatically with infrastructure
+**Maintainability**: Centralized security group management via Terraform
+
+### **8. Monitoring and Observability Strategy**
+
+#### **Built-in Health Checks**:
+- **Application Level**: `/health` endpoints for all services
+- **Infrastructure Level**: AWS CloudWatch integration
+- **Container Level**: Docker health checks and restart policies
+
+#### **Logging Strategy**:
+- **Centralized**: Docker logs aggregated via log drivers
+- **Structured**: JSON logging for better parsing and analysis
+- **Retention**: Configurable log retention policies
+
+**Future Enhancements**: Ready for Prometheus/Grafana, ELK stack integration
 
 ## 🔧 Technology Choices
 
@@ -289,40 +433,331 @@ chmod +x deploy.sh destroy.sh
 - **Spot Instances**: Cost optimization with mixed instance types
 - **CloudWatch Metrics**: Custom metrics for scaling decisions
 
-## 🧪 Testing Strategy
+## 🧪 Comprehensive Testing Strategy
 
-### Infrastructure Testing
+This section outlines our multi-layered testing approach designed to ensure reliability, performance, and security across all infrastructure and application components.
+
+### **Testing Philosophy**
+
+Our testing strategy follows the **Test Pyramid** approach with emphasis on:
+- **Shift-Left Testing**: Catch issues early in the development cycle
+- **Automated Testing**: Minimize manual intervention and human error
+- **Production-Like Testing**: Test in environments that mirror production
+- **Continuous Validation**: Ongoing monitoring and health checks
+
+### **1. Infrastructure Testing (IaC Validation)**
+
+#### **Static Analysis & Validation**
 ```bash
-# Validate Terraform configuration
-terraform validate
+# Terraform Configuration Validation
+terraform fmt -check          # Code formatting standards
+terraform validate            # Syntax and configuration validation
+terraform plan -detailed-exitcode  # Infrastructure change analysis
 
-# Plan deployment (dry run)
-terraform plan
+# Security Scanning
+tfsec .                       # Terraform security scanner
+checkov -f main.tf           # Infrastructure security analysis
+terrascan scan -t terraform  # Policy-as-code validation
+```
 
-# Check AWS resources
+#### **Infrastructure Compliance Testing**
+```bash
+# AWS Resource Validation
 aws ec2 describe-instances --filters "Name=tag:Project,Values=docker-swarm-cluster"
+aws elbv2 describe-load-balancers --names docker-swarm-cluster-alb
+aws ec2 describe-security-groups --group-names docker-swarm-*
+
+# Network Connectivity Testing
+aws ec2 describe-route-tables --filters "Name=tag:Project,Values=docker-swarm-cluster"
+aws ec2 describe-nat-gateways --filter "Name=tag:Project,Values=docker-swarm-cluster"
 ```
 
-### Application Testing
+#### **Cost and Resource Optimization Testing**
 ```bash
-# SSH to manager and check cluster
-ssh -i docker-swarm-key.pem ubuntu@<manager-ip>
-docker node ls
-docker service ls
+# Resource Utilization Analysis
+aws cloudwatch get-metric-statistics --namespace AWS/EC2 \
+  --metric-name CPUUtilization --start-time 2024-01-01T00:00:00Z \
+  --end-time 2024-01-02T00:00:00Z --period 3600 --statistics Average
 
-# Test API endpoints
-curl http://<load-balancer-dns>/api/health
-curl http://<load-balancer-dns>/api/test
+# Cost Analysis
+aws ce get-cost-and-usage --time-period Start=2024-01-01,End=2024-01-02 \
+  --granularity DAILY --metrics BlendedCost
 ```
 
-### Load Testing
+### **2. Container & Orchestration Testing**
+
+#### **Docker Swarm Cluster Validation**
 ```bash
-# Using Apache Bench
-ab -n 1000 -c 10 http://<load-balancer-dns>/
-
-# Using curl for health checks
-for i in {1..10}; do curl -s http://<load-balancer-dns>/health; done
+# Cluster Health Checks
+ssh -i docker-swarm-key.pem ubuntu@<manager-ip> << 'EOF'
+  # Cluster status validation
+  docker node ls --format "table {{.Hostname}}\t{{.Status}}\t{{.Availability}}\t{{.ManagerStatus}}"
+  
+  # Service deployment validation
+  docker service ls --format "table {{.Name}}\t{{.Replicas}}\t{{.Image}}\t{{.Ports}}"
+  
+  # Network connectivity testing
+  docker network ls --filter driver=overlay
+  docker service ps --no-trunc $(docker service ls -q)
+EOF
 ```
+
+#### **Service Discovery & Load Balancing Tests**
+```bash
+# Internal service communication testing
+docker exec $(docker ps -q -f name=backend) curl -f http://postgres:5432
+docker exec $(docker ps -q -f name=backend) curl -f http://redis:6379/ping
+
+# Traefik routing validation
+curl -H "Host: localhost" http://<manager-ip>/api/health
+curl -H "Host: localhost" http://<manager-ip>/
+```
+
+### **3. Application Testing**
+
+#### **Health Check Validation**
+```bash
+# Application health endpoints
+health_check() {
+  local service=$1
+  local endpoint=$2
+  local expected_status=$3
+  
+  response=$(curl -s -o /dev/null -w "%{http_code}" "$endpoint")
+  if [ "$response" = "$expected_status" ]; then
+    echo "✅ $service health check passed"
+  else
+    echo "❌ $service health check failed (got $response, expected $expected_status)"
+  fi
+}
+
+# Execute health checks
+health_check "Frontend" "http://<load-balancer-dns>/" "200"
+health_check "Backend API" "http://<load-balancer-dns>/api/health" "200"
+health_check "Database" "http://<load-balancer-dns>/api/db-status" "200"
+```
+
+#### **API Contract Testing**
+```bash
+# API endpoint validation with expected responses
+api_test() {
+  echo "Testing API endpoints..."
+  
+  # Test GET endpoints
+  curl -X GET http://<load-balancer-dns>/api/health | jq '.status == "healthy"'
+  curl -X GET http://<load-balancer-dns>/api/version | jq '.version'
+  
+  # Test POST endpoints (if applicable)
+  curl -X POST -H "Content-Type: application/json" \
+    -d '{"test": "data"}' http://<load-balancer-dns>/api/test
+}
+```
+
+#### **Database Integration Testing**
+```bash
+# Database connectivity and operations
+db_test() {
+  ssh -i docker-swarm-key.pem ubuntu@<manager-ip> << 'EOF'
+    # Test database connection
+    docker exec $(docker ps -q -f name=postgres) \
+      psql -U user -d appdb -c "SELECT version();"
+    
+    # Test basic CRUD operations
+    docker exec $(docker ps -q -f name=postgres) \
+      psql -U user -d appdb -c "CREATE TABLE IF NOT EXISTS test_table (id SERIAL PRIMARY KEY, name VARCHAR(50));"
+    
+    docker exec $(docker ps -q -f name=postgres) \
+      psql -U user -d appdb -c "INSERT INTO test_table (name) VALUES ('test_deployment');"
+    
+    docker exec $(docker ps -q -f name=postgres) \
+      psql -U user -d appdb -c "SELECT * FROM test_table WHERE name = 'test_deployment';"
+EOF
+}
+```
+
+### **4. Performance & Load Testing**
+
+#### **Load Testing with Multiple Tools**
+```bash
+# Apache Bench - Basic load testing
+ab -n 10000 -c 100 -H "Host: localhost" http://<load-balancer-dns>/
+
+# Artillery.js - Advanced load testing
+cat > load-test.yml << EOF
+config:
+  target: 'http://<load-balancer-dns>'
+  phases:
+    - duration: 60
+      arrivalRate: 10
+    - duration: 120
+      arrivalRate: 50
+    - duration: 60
+      arrivalRate: 100
+scenarios:
+  - name: "Frontend Load Test"
+    requests:
+      - get:
+          url: "/"
+      - get:
+          url: "/api/health"
+EOF
+
+artillery run load-test.yml
+```
+
+#### **Stress Testing & Resource Monitoring**
+```bash
+# Resource utilization during load
+stress_test() {
+  # Start monitoring
+  ssh -i docker-swarm-key.pem ubuntu@<manager-ip> 'htop' &
+  
+  # Generate load
+  ab -n 50000 -c 200 http://<load-balancer-dns>/ &
+  
+  # Monitor Docker stats
+  ssh -i docker-swarm-key.pem ubuntu@<manager-ip> \
+    'docker stats --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"'
+}
+```
+
+### **5. Security Testing**
+
+#### **Network Security Validation**
+```bash
+# Port scanning and security validation
+security_test() {
+  # Test that only required ports are open
+  nmap -p 22,80,443,8080 <manager-ip>
+  nmap -p 1-65535 <worker-ip>  # Should show no open ports
+  
+  # SSL/TLS configuration testing
+  sslscan <load-balancer-dns>:443
+  testssl.sh https://<load-balancer-dns>
+  
+  # Security headers validation
+  curl -I https://<load-balancer-dns> | grep -E "(X-Frame-Options|X-Content-Type-Options|Strict-Transport-Security)"
+}
+```
+
+#### **Container Security Scanning**
+```bash
+# Container vulnerability scanning
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+  aquasec/trivy image traefik:v3.0
+
+docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+  aquasec/trivy image nginx:alpine
+```
+
+### **6. Disaster Recovery Testing**
+
+#### **Node Failure Simulation**
+```bash
+# Simulate worker node failure
+disaster_recovery_test() {
+  echo "Simulating worker node failure..."
+  
+  # Stop a worker node
+  aws ec2 stop-instances --instance-ids <worker-instance-id>
+  
+  # Verify service redistribution
+  sleep 60
+  ssh -i docker-swarm-key.pem ubuntu@<manager-ip> \
+    'docker service ps --no-trunc $(docker service ls -q)'
+  
+  # Test application availability during failure
+  for i in {1..10}; do
+    curl -f http://<load-balancer-dns>/api/health
+    sleep 5
+  done
+  
+  # Restart the node
+  aws ec2 start-instances --instance-ids <worker-instance-id>
+}
+```
+
+### **7. Automated Testing Pipeline**
+
+#### **CI/CD Integration Testing**
+```yaml
+# Example GitHub Actions workflow for testing
+name: Infrastructure Testing
+on: [push, pull_request]
+
+jobs:
+  terraform-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+      - name: Terraform Validate
+        run: terraform validate
+      - name: Security Scan
+        run: |
+          docker run --rm -v $(pwd):/src aquasec/tfsec /src
+          docker run --rm -v $(pwd):/tf bridgecrew/checkov -f /tf
+```
+
+#### **Monitoring & Alerting Tests**
+```bash
+# Test monitoring endpoints
+monitoring_test() {
+  # Traefik dashboard accessibility
+  curl -f http://<manager-ip>:8080/dashboard/
+  
+  # Custom metrics endpoints
+  curl -f http://<load-balancer-dns>/metrics
+  
+  # Log aggregation testing
+  ssh -i docker-swarm-key.pem ubuntu@<manager-ip> \
+    'docker service logs --tail 100 $(docker service ls -q)'
+}
+```
+
+### **8. Testing Tools & Technologies**
+
+| Testing Type | Primary Tools | Secondary Tools | Purpose |
+|--------------|---------------|-----------------|---------|
+| **Infrastructure** | Terraform, tfsec | Checkov, Terrascan | IaC validation & security |
+| **Container** | Docker, docker-compose | Hadolint, Dive | Container best practices |
+| **API** | curl, Postman | Newman, Insomnia | API contract testing |
+| **Load** | Apache Bench, Artillery | JMeter, K6 | Performance validation |
+| **Security** | nmap, sslscan | OWASP ZAP, Trivy | Security assessment |
+| **Monitoring** | CloudWatch, htop | Prometheus, Grafana | Performance monitoring |
+
+### **9. Test Automation & Reporting**
+
+#### **Automated Test Execution**
+```bash
+#!/bin/bash
+# comprehensive-test.sh - Complete testing suite
+
+set -e
+
+echo "🚀 Starting Comprehensive Testing Suite"
+
+# Infrastructure tests
+echo "📋 Running Infrastructure Tests..."
+terraform validate && echo "✅ Terraform validation passed"
+
+# Application tests  
+echo "🔍 Running Application Tests..."
+./scripts/health-check.sh && echo "✅ Health checks passed"
+
+# Performance tests
+echo "⚡ Running Performance Tests..."
+ab -n 1000 -c 10 http://<load-balancer-dns>/ > /dev/null && echo "✅ Load test passed"
+
+# Security tests
+echo "🔒 Running Security Tests..."
+nmap -p 80,443 <load-balancer-dns> > /dev/null && echo "✅ Security scan passed"
+
+echo "🎉 All tests completed successfully!"
+```
+
+This comprehensive testing strategy ensures that every component of the Docker Swarm infrastructure is thoroughly validated before, during, and after deployment, providing confidence in the system's reliability and performance.
 
 ## 🔒 Security Measures
 

@@ -28,6 +28,7 @@ log "Installing required packages..."
 apt-get install -y \
     apt-transport-https \
     ca-certificates \
+    netcat-openbsd \
     curl \
     gnupg \
     lsb-release \
@@ -93,6 +94,21 @@ fi
 # Join the Swarm as a worker
 log "Joining Docker Swarm as worker..."
 PRIVATE_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
+log "Worker IP: $PRIVATE_IP, Manager IP: $MANAGER_IP"
+log "Join command: docker swarm join --token $WORKER_TOKEN $MANAGER_IP:2377"
+
+# Test connectivity to manager first
+log "Testing connectivity to manager on port 2377..."
+if nc -z $MANAGER_IP 2377; then
+    log "Successfully connected to manager on port 2377"
+else
+    log "ERROR: Cannot connect to manager on port 2377"
+    log "Checking if manager IP is reachable..."
+    ping -c 3 $MANAGER_IP || log "Manager IP not reachable"
+    exit 1
+fi
+
+# Join the swarm
 docker swarm join --token $WORKER_TOKEN $MANAGER_IP:2377
 
 # Verify join was successful

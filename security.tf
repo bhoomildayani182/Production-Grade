@@ -110,6 +110,15 @@ resource "aws_security_group" "swarm_worker" {
     cidr_blocks = var.allowed_cidr_blocks
   }
 
+  # Docker Swarm Management (worker needs to connect to manager)
+  ingress {
+    description = "Docker Swarm Management"
+    from_port   = 2377
+    to_port     = 2377
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
   # Container network discovery (allow from VPC)
   ingress {
     description = "Container Network Discovery"
