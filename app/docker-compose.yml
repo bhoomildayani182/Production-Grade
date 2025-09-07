@@ -55,7 +55,7 @@ services:
       - traefik-public
       - app-network
     deploy:
-      replicas: 2
+      replicas: 1
       placement:
         constraints:
           - node.role == worker
@@ -74,7 +74,9 @@ services:
 
   # Backend API - Node.js
   backend:
-    image: swarm-backend:latest
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     environment:
       - NODE_ENV=production
       - PORT=3000
@@ -83,7 +85,7 @@ services:
       - app-network
       - traefik-public
     deploy:
-      replicas: 3
+      replicas: 1
       placement:
         constraints:
           - node.role == worker
