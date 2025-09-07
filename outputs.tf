@@ -17,7 +17,7 @@ output "private_subnet_ids" {
 
 output "swarm_manager_public_ip" {
   description = "Public IP address of the Docker Swarm manager"
-  value       = aws_instance.swarm_manager.public_ip
+  value       = aws_eip.swarm_manager.public_ip
 }
 
 output "swarm_manager_private_ip" {
@@ -47,12 +47,12 @@ output "load_balancer_zone_id" {
 
 output "ssh_command_manager" {
   description = "SSH command to connect to the manager node"
-  value       = "ssh -i ${var.key_name}.pem ubuntu@${aws_instance.swarm_manager.public_ip}"
+  value       = "ssh -i ${var.key_name}.pem ubuntu@${aws_eip.swarm_manager.public_ip}"
 }
 
 output "ssh_commands_workers" {
-  description = "SSH commands to connect to worker nodes"
-  value       = [for i, worker in aws_instance.swarm_workers : "ssh -i ${var.key_name}.pem ubuntu@${worker.public_ip}"]
+  description = "SSH commands to connect to worker nodes (via bastion/manager)"
+  value       = [for i, worker in aws_instance.swarm_workers : "ssh -i ${var.key_name}.pem -o ProxyJump=ubuntu@${aws_eip.swarm_manager.public_ip} ubuntu@${worker.private_ip}"]
 }
 
 output "application_url" {
