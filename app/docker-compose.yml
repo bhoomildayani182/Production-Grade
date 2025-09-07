@@ -47,10 +47,7 @@ services:
 
   # Frontend - Nginx
   frontend:
-    image: nginx:alpine
-    volumes:
-      - ./frontend/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./frontend/html:/usr/share/nginx/html:ro
+    image: bhoomildayani182/swarm-frontend:latest
     networks:
       - traefik-public
       - app-network
@@ -74,9 +71,7 @@ services:
 
   # Backend API - Node.js
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: bhoomildayani182/swarm-backend:latest
     environment:
       - NODE_ENV=production
       - PORT=3000
