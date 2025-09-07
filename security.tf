@@ -7,13 +7,22 @@ resource "aws_security_group" "swarm_manager" {
 
   description = "Security group for Docker Swarm manager node"
 
-  # SSH access
+  # SSH access from external
   ingress {
     description = "SSH"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = var.allowed_cidr_blocks
+  }
+
+  # SSH access within VPC (for inter-node communication)
+  ingress {
+    description = "SSH within VPC"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   # Docker Swarm management port (allow from VPC)
@@ -101,13 +110,22 @@ resource "aws_security_group" "swarm_worker" {
 
   description = "Security group for Docker Swarm worker nodes"
 
-  # SSH access
+  # SSH access from external
   ingress {
     description = "SSH"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = var.allowed_cidr_blocks
+  }
+
+  # SSH access within VPC (for inter-node communication)
+  ingress {
+    description = "SSH within VPC"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   # Docker Swarm Management (worker needs to connect to manager)

@@ -55,6 +55,23 @@ systemctl enable docker
 # Add ubuntu user to docker group
 usermod -aG docker ubuntu
 
+# Set up SSH key for inter-node communication
+log "Setting up SSH keys for inter-node communication..."
+mkdir -p /home/ubuntu/.ssh
+chown ubuntu:ubuntu /home/ubuntu/.ssh
+chmod 700 /home/ubuntu/.ssh
+
+# Create SSH config to disable strict host key checking for VPC communication
+cat > /home/ubuntu/.ssh/config << EOF
+Host 10.*
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    LogLevel ERROR
+EOF
+
+chown ubuntu:ubuntu /home/ubuntu/.ssh/config
+chmod 600 /home/ubuntu/.ssh/config
+
 # Install Docker Compose (standalone)
 log "Installing Docker Compose..."
 DOCKER_COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)
@@ -68,16 +85,26 @@ sleep 10
 # Wait for manager to be ready and get join token
 log "Waiting for manager node to be ready..."
 RETRY_COUNT=0
-MAX_RETRIES=30
+MAX_RETRIES=10
 
 while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     log "Attempting to retrieve join token from manager (attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)..."
     
-    # Try to get the worker token from the manager
+    # First try to get the worker token from the file on manager node
+    log "Trying to read worker token from file on manager node..."
+    WORKER_TOKEN=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@$MANAGER_IP "cat /tmp/worker-token 2>/dev/null" 2>/dev/null || echo "")
+    
+    if [ ! -z "$WORKER_TOKEN" ]; then
+        log "Successfully retrieved worker token from file on manager"
+        break
+    fi
+    
+    # If file doesn't exist or is empty, fall back to docker command
+    log "Token file not found or empty, trying docker command..."
     WORKER_TOKEN=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@$MANAGER_IP "sudo docker swarm join-token -q worker" 2>/dev/null || echo "")
     
     if [ ! -z "$WORKER_TOKEN" ]; then
-        log "Successfully retrieved worker token from manager"
+        log "Successfully retrieved worker token from docker command"
         break
     fi
     

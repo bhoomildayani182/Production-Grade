@@ -78,6 +78,28 @@ echo $WORKER_TOKEN > /tmp/worker-token
 echo $MANAGER_TOKEN > /tmp/manager-token
 echo $PRIVATE_IP > /tmp/manager-ip
 
+# Set up SSH key for inter-node communication
+log "Setting up SSH keys for inter-node communication..."
+# Copy the private key from the instance metadata or create SSH config
+mkdir -p /home/ubuntu/.ssh
+chown ubuntu:ubuntu /home/ubuntu/.ssh
+chmod 700 /home/ubuntu/.ssh
+
+# Create SSH config to disable strict host key checking for VPC communication
+cat > /home/ubuntu/.ssh/config << EOF
+Host 10.*
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+    LogLevel ERROR
+EOF
+
+chown ubuntu:ubuntu /home/ubuntu/.ssh/config
+chmod 600 /home/ubuntu/.ssh/config
+
+# Make tokens readable by ubuntu user
+chown ubuntu:ubuntu /tmp/worker-token /tmp/manager-token /tmp/manager-ip
+chmod 644 /tmp/worker-token /tmp/manager-token /tmp/manager-ip
+
 # Create swarm network for applications
 log "Creating overlay network for applications..."
 docker network create --driver overlay --attachable app-network
