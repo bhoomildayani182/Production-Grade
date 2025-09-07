@@ -80,21 +80,38 @@ echo $PRIVATE_IP > /tmp/manager-ip
 
 # Set up SSH key for inter-node communication
 log "Setting up SSH keys for inter-node communication..."
-# Copy the private key from the instance metadata or create SSH config
+# Ensure SSH directory exists with proper permissions
 mkdir -p /home/ubuntu/.ssh
 chown ubuntu:ubuntu /home/ubuntu/.ssh
 chmod 700 /home/ubuntu/.ssh
 
-# Create SSH config to disable strict host key checking for VPC communication
+# Copy the AWS key pair private key to ubuntu user's SSH directory
+# The key is automatically placed in /home/ubuntu/.ssh/ by AWS
+if [ -f /home/ubuntu/.ssh/authorized_keys ]; then
+    log "Found authorized_keys file"
+    # Extract the key name from the authorized_keys comment (usually the key pair name)
+    KEY_NAME=$(grep -o 'aws-key-[^[:space:]]*' /home/ubuntu/.ssh/authorized_keys | head -1 || echo "aws-key")
+    log "Using key name: $KEY_NAME"
+else
+    log "Warning: No authorized_keys file found"
+fi
+
+# Create SSH config to use the AWS key pair and disable strict host key checking
 cat > /home/ubuntu/.ssh/config << EOF
 Host 10.*
     StrictHostKeyChecking no
     UserKnownHostsFile /dev/null
     LogLevel ERROR
+    IdentitiesOnly yes
+    PasswordAuthentication no
 EOF
 
 chown ubuntu:ubuntu /home/ubuntu/.ssh/config
 chmod 600 /home/ubuntu/.ssh/config
+
+# Ensure the ubuntu user can access the SSH agent
+log "Setting up SSH agent for ubuntu user..."
+sudo -u ubuntu ssh-add -l 2>/dev/null || log "No SSH keys in agent (this is normal)"
 
 # Make tokens readable by ubuntu user
 chown ubuntu:ubuntu /tmp/worker-token /tmp/manager-token /tmp/manager-ip

@@ -57,20 +57,38 @@ usermod -aG docker ubuntu
 
 # Set up SSH key for inter-node communication
 log "Setting up SSH keys for inter-node communication..."
+# Ensure SSH directory exists with proper permissions
 mkdir -p /home/ubuntu/.ssh
 chown ubuntu:ubuntu /home/ubuntu/.ssh
 chmod 700 /home/ubuntu/.ssh
 
-# Create SSH config to disable strict host key checking for VPC communication
+# Copy the AWS key pair private key to ubuntu user's SSH directory
+# The key is automatically placed in /home/ubuntu/.ssh/ by AWS
+if [ -f /home/ubuntu/.ssh/authorized_keys ]; then
+    log "Found authorized_keys file"
+    # Extract the key name from the authorized_keys comment (usually the key pair name)
+    KEY_NAME=$(grep -o 'aws-key-[^[:space:]]*' /home/ubuntu/.ssh/authorized_keys | head -1 || echo "aws-key")
+    log "Using key name: $KEY_NAME"
+else
+    log "Warning: No authorized_keys file found"
+fi
+
+# Create SSH config to use the AWS key pair and disable strict host key checking
 cat > /home/ubuntu/.ssh/config << EOF
 Host 10.*
     StrictHostKeyChecking no
     UserKnownHostsFile /dev/null
     LogLevel ERROR
+    IdentitiesOnly yes
+    PasswordAuthentication no
 EOF
 
 chown ubuntu:ubuntu /home/ubuntu/.ssh/config
 chmod 600 /home/ubuntu/.ssh/config
+
+# Ensure the ubuntu user can access the SSH agent
+log "Setting up SSH agent for ubuntu user..."
+sudo -u ubuntu ssh-add -l 2>/dev/null || log "No SSH keys in agent (this is normal)"
 
 # Install Docker Compose (standalone)
 log "Installing Docker Compose..."
@@ -82,6 +100,34 @@ chmod +x /usr/local/bin/docker-compose
 log "Waiting for Docker to be ready..."
 sleep 10
 
+# Test SSH connectivity to manager first
+log "Testing SSH connectivity to manager node..."
+SSH_TEST_COUNT=0
+MAX_SSH_RETRIES=5
+
+while [ $SSH_TEST_COUNT -lt $MAX_SSH_RETRIES ]; do
+    log "Testing SSH connection to manager (attempt $((SSH_TEST_COUNT + 1))/$MAX_SSH_RETRIES)..."
+    
+    # Test basic SSH connectivity
+    if sudo -u ubuntu ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 -o BatchMode=yes ubuntu@$MANAGER_IP "echo 'SSH connection successful'" 2>/dev/null; then
+        log "SSH connection to manager successful"
+        break
+    else
+        log "SSH connection failed, retrying in 15 seconds..."
+        sleep 15
+        SSH_TEST_COUNT=$((SSH_TEST_COUNT + 1))
+    fi
+done
+
+if [ $SSH_TEST_COUNT -eq $MAX_SSH_RETRIES ]; then
+    log "ERROR: Failed to establish SSH connection to manager after $MAX_SSH_RETRIES attempts"
+    log "Please check:"
+    log "1. Security groups allow SSH (port 22) between VPC subnets"
+    log "2. Both nodes are using the same AWS key pair"
+    log "3. Manager node is accessible and running"
+    exit 1
+fi
+
 # Wait for manager to be ready and get join token
 log "Waiting for manager node to be ready..."
 RETRY_COUNT=0
@@ -92,7 +138,7 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     
     # First try to get the worker token from the file on manager node
     log "Trying to read worker token from file on manager node..."
-    WORKER_TOKEN=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@$MANAGER_IP "cat /tmp/worker-token 2>/dev/null" 2>/dev/null || echo "")
+    WORKER_TOKEN=$(sudo -u ubuntu ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@$MANAGER_IP "cat /tmp/worker-token 2>/dev/null" 2>/dev/null || echo "")
     
     if [ ! -z "$WORKER_TOKEN" ]; then
         log "Successfully retrieved worker token from file on manager"
@@ -101,7 +147,7 @@ while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
     
     # If file doesn't exist or is empty, fall back to docker command
     log "Token file not found or empty, trying docker command..."
-    WORKER_TOKEN=$(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@$MANAGER_IP "sudo docker swarm join-token -q worker" 2>/dev/null || echo "")
+    WORKER_TOKEN=$(sudo -u ubuntu ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ubuntu@$MANAGER_IP "sudo docker swarm join-token -q worker" 2>/dev/null || echo "")
     
     if [ ! -z "$WORKER_TOKEN" ]; then
         log "Successfully retrieved worker token from docker command"
